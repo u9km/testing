@@ -1,0 +1,9 @@
+Package: com.muntadhar.v12
+Name: V12 Protection
+Version: 1.0
+Architecture: iphoneos-arm
+Description: Universal Non-JB Protection Suite
+Maintainer: Muntadhar
+Author: Muntadhar
+Section: Tweaks
+Depends: mobilesubstrate
