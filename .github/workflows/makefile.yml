@@ -1,31 +1,31 @@
-name: Build V12 Full Version
+name: Build V12 Final
 
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: # زر التشغيل اليدوي
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build V12 Protection
+    name: Build V12 Package
     runs-on: macos-latest
     
     steps:
-      # 1. سحب الكود
+      # 1. سحب الكود (تحديث إلى v4)
       - name: Checkout Source Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # 2. إعداد Theos
+      # 2. إعداد Theos (تحديث إلى v4)
       - name: Setup Theos
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: theos/theos
           path: theos
           submodules: recursive
 
-      # 3. تحميل SDK (iOS 14.5 - المستقر)
+      # 3. تحميل SDK (iOS 14.5)
       - name: Setup iOS SDK
         run: |
           mkdir -p theos/sdks
@@ -38,14 +38,14 @@ jobs:
         run: echo "THEOS=$GITHUB_WORKSPACE/theos" >> $GITHUB_ENV
 
       # 5. البناء (Build)
-      # نستخدم FINALPACKAGE=1 لضغط الكود وحذف الرموز الزائدة
       - name: Build Package
         run: |
           make package FINALPACKAGE=1 DEBUG=0
 
-      # 6. الرفع (Upload)
+      # 6. الرفع (تحديث إلى v4 - هذا هو حل المشكلة)
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: V12_Final_Build
           path: packages/*.deb
+          if-no-files-found: error
