@@ -1,4 +1,4 @@
-name: Build V12 Final
+name: Build V12 Fixed
 
 on:
   push:
@@ -7,17 +7,17 @@ on:
 
 jobs:
   build:
-    name: Build V12 Package
+    name: Build Package
     runs-on: macos-latest
     
     steps:
-      # 1. سحب الكود (تحديث إلى v4)
+      # 1. سحب الكود
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # 2. إعداد Theos (تحديث إلى v4)
+      # 2. إعداد Theos
       - name: Setup Theos
         uses: actions/checkout@v4
         with:
@@ -25,27 +25,24 @@ jobs:
           path: theos
           submodules: recursive
 
-      # 3. تحميل SDK (iOS 14.5)
+      # 3. إعداد SDK (تم التصحيح: استخدام Git Clone بدلاً من التحميل)
       - name: Setup iOS SDK
         run: |
-          mkdir -p theos/sdks
-          curl -L -o iOS14.5.sdk.tar.xz https://github.com/xybp888/iOS-SDKs/releases/download/iOS14.5-SDK/iOS14.5.sdk.tar.xz
-          tar -xf iOS14.5.sdk.tar.xz -C theos/sdks
-          rm iOS14.5.sdk.tar.xz
+          git clone --quiet --depth=1 https://github.com/theos/sdks.git theos/sdks
 
       # 4. تعريف المسارات
       - name: Set Environment
         run: echo "THEOS=$GITHUB_WORKSPACE/theos" >> $GITHUB_ENV
 
-      # 5. البناء (Build)
+      # 5. البناء
       - name: Build Package
         run: |
           make package FINALPACKAGE=1 DEBUG=0
 
-      # 6. الرفع (تحديث إلى v4 - هذا هو حل المشكلة)
+      # 6. الرفع
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: V12_Final_Build
+          name: V12_Build_Output
           path: packages/*.deb
           if-no-files-found: error
