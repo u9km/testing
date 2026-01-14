@@ -1,22 +1,16 @@
-# إعدادات الهدف (iOS)
 TARGET := iphone:latest:14.0
 ARCHS = arm64
 
-# إعدادات الإنتاج (Production)
 DEBUG = 0
 FINALPACKAGE = 1
 
-# اسم التويك (يجب أن يطابق اسم الـ plist)
-TWEAK_NAME = V12
+TWEAK_NAME = V12VN
 
-# ملفات المشروع
-V12_FILES = V12.m
+# دمج الملفين هنا ضروري جداً
+V12VN_FILES = Tweak.xm V12.m
 
-# أعلام المترجم (تفعيل ARC)
-V12_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
-
-# المكتبات المطلوبة
-V12_FRAMEWORKS = UIKit Foundation
+V12VN_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
+V12VN_FRAMEWORKS = UIKit Foundation
 
 include $(THEOS)/makefiles/common.mk
 include $(THEOS_MAKE_PATH)/tweak.mk
