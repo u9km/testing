@@ -6,7 +6,8 @@
 	<dict>
 		<key>Bundles</key>
 		<array>
-			<string>com.tencent.ig</string>       <string>com.pubg.krmobile</string>    <string>com.vng.pubgmobile</string>   <string>com.rekoo.pubgm</string>      <string>com.pubg.imobile</string>     </array>
+			<string>com.vng.pubgmobile</string>
+		</array>
 	</dict>
 </dict>
 </plist>
