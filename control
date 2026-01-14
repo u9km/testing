@@ -1,8 +1,8 @@
-Package: com.muntadhar.v12
-Name: V12 Protection
-Version: 1.0
+Package: com.muntadhar.v12vn
+Name: V12 VN Protection
+Version: 3.0
 Architecture: iphoneos-arm
-Description: Universal Non-JB Protection Suite
+Description: V12 Protection + BulletTrack for VN Version
 Maintainer: Muntadhar
 Author: Muntadhar
 Section: Tweaks
