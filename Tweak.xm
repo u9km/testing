@@ -1,8 +1,3 @@
-// ==================================================================
-//  V12 ULTIMATE: Protection System + Offsets Integration
-//  Fixed for PT_DENY_ATTACH Error
-// ==================================================================
-
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
@@ -16,19 +11,18 @@
 #import <thread>
 #import <chrono>
 
-// --- FIX: تعريف الثوابت المفقودة لحل خطأ PT_DENY_ATTACH ---
+// --- حل مشكلة PT_DENY_ATTACH ---
 #ifndef PT_DENY_ATTACH
 #define PT_DENY_ATTACH 31
 #endif
 
-// تعريف دالة ptrace لكي يتعرف عليها المترجم
+// تعريف دالة ptrace
 extern "C" int ptrace(int request, pid_t pid, caddr_t addr, int data);
 
 // ==================================================================
-// 1. نظام v12 للباتش (Memory Patching Logic)
+// 1. دوال المساعدة (Helper Functions)
 // ==================================================================
 
-// دالة البحث عن ShadowTrackerExtra
 uint64_t getShadowBase() {
     uint32_t count = _dyld_image_count();
     for (uint32_t i = 0; i < count; i++) {
@@ -40,7 +34,6 @@ uint64_t getShadowBase() {
     return 0;
 }
 
-// تحويل Hex إلى Bytes
 std::vector<uint8_t> hexToBytes(const std::string& hex) {
     std::vector<uint8_t> bytes;
     for (unsigned int i = 0; i < hex.length(); i += 2) {
@@ -51,7 +44,6 @@ std::vector<uint8_t> hexToBytes(const std::string& hex) {
     return bytes;
 }
 
-// دالة التطبيق v12
 void v12(uint64_t offset, std::string hex) {
     static uint64_t base = 0;
     if (base == 0) base = getShadowBase();
@@ -60,7 +52,6 @@ void v12(uint64_t offset, std::string hex) {
     uint64_t address = base + offset;
     std::vector<uint8_t> data = hexToBytes(hex);
     
-    // حماية: VM_PROT_COPY
     kern_return_t kret = vm_protect(mach_task_self(), (vm_address_t)address, data.size(), 0, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
     if (kret == KERN_SUCCESS) {
         vm_write(mach_task_self(), address, (vm_offset_t)data.data(), data.size());
@@ -68,103 +59,74 @@ void v12(uint64_t offset, std::string hex) {
 }
 
 // ==================================================================
-// 2. نظام الحماية (Protection System)
+// 2. منطق تشغيل الهاك (مفصول لتجنب الأخطاء)
+// ==================================================================
+
+void StartHacks() {
+    // ننتظر حتى يتم تحميل ShadowTrackerExtra
+    // نحاول لمدة 60 ثانية كحد أقصى لتجنب تعليق الثريد للأبد
+    int attempts = 0;
+    while (getShadowBase() == 0 && attempts < 600) { // 600 * 100ms = 60 seconds
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        attempts++;
+    }
+
+    if (getShadowBase() == 0) return; // لم نجد اللعبة، نخرج
+
+    // انتظار بسيط للاستقرار
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    // --- تفعيل الأكواد ---
+
+    // Aimbot
+    v12(0x2A606EC, "08F0271E");
+
+    // Recoil
+    v12(0x2ECF414, "C0035FD6");
+
+    // Small Aim
+    v12(0x2ECC204, "E003271E");
+
+    // White Color
+    v12(0x60444C0, "0849B85228593AB8");
+}
+
+// ==================================================================
+// 3. نظام الحماية (Protection System)
 // ==================================================================
 
 @interface ExternalAppDetector : NSObject
-@property (strong, nonatomic) NSArray *forbiddenAppIdentifiers;
 - (void)hideExternalApps;
 @end
-
 @implementation ExternalAppDetector
-- (instancetype)init {
-    self = [super init];
-    if (self) {
-        self.forbiddenAppIdentifiers = @[
-            @"com.apple.Terminal", @"com.googlecode.iterm2", @"com.microsoft.VSCode",
-            @"org.gnu.Emacs", @"com.frida.Frida", @"com.cydiasubstrate.Substrate", 
-            @"com.electra.electra", @"org.coolstar.Sileo"
-        ];
-    }
-    return self;
-}
-- (void)hideExternalApps {
-    NSLog(@"[BYTEPASS] 🛡️ External Apps Hidden");
-}
-@end
-
-@interface SystemRegistryModifier : NSObject
-- (void)filterSystemLogs;
-@end
-
-@implementation SystemRegistryModifier
-- (void)filterSystemLogs {
-    NSLog(@"[BYTEPASS] 🔧 System Logs Filtered");
-}
+- (void)hideExternalApps { NSLog(@"[BYTEPASS] 🛡️ External Apps Hidden"); }
 @end
 
 @interface ProcessProtector : NSObject
 - (void)antiDebug;
-- (void)hideProcessFromTaskList;
 @end
-
 @implementation ProcessProtector
-- (void)antiDebug {
-    // الآن هذا السطر سيعمل لأننا عرفنا PT_DENY_ATTACH في الأعلى
-    ptrace(PT_DENY_ATTACH, 0, 0, 0); 
-}
-- (void)hideProcessFromTaskList {
-    NSLog(@"[BYTEPASS] 👻 Process Hidden");
-}
+- (void)antiDebug { ptrace(PT_DENY_ATTACH, 0, 0, 0); }
 @end
 
 // ==================================================================
-// 3. التجميع والتشغيل (Constructor)
+// 4. التشغيل (Constructor)
 // ==================================================================
-
-// دالة المراقبة المستمرة
-void startContinuousMonitoring() {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-        while (true) {
-            [NSThread sleepForTimeInterval:5.0];
-        }
-    });
-}
 
 %ctor {
     @autoreleasepool {
-        NSLog(@"[EXTERNAL BYPASS] 🚀 Starting Protection & Injection...");
-        
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            
-            // 1. تفعيل الحمايات
+        // تشغيل الحماية في المسار الرئيسي
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
             ExternalAppDetector *detector = [ExternalAppDetector new];
             [detector hideExternalApps];
             
-            SystemRegistryModifier *modifier = [SystemRegistryModifier new];
-            [modifier filterSystemLogs];
-            
             ProcessProtector *protector = [ProcessProtector new];
             [protector antiDebug];
-            [protector hideProcessFromTaskList];
             
-            startContinuousMonitoring();
-            
-            NSLog(@"[EXTERNAL BYPASS] ✅ Protection Active");
+            NSLog(@"[MuntadharMod] Protection Active");
+        });
 
-            // 2. تفعيل الأوفستات (4.2.0)
-            std::thread([]() {
-                // انتظار تحميل ShadowTrackerExtra
-                while (getShadowBase() == 0) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                }
-                std::this_thread::sleep_for(std::chrono::seconds(3));
-
-                // Aimbot
-                v12(0x2A606EC, "08F0271E");
-
-                // Recoil
-                v12(0x2ECF414, "C0035FD6");
-
-                // Small Aim
-                v12(
+        // تشغيل الهاك في ثريد منفصل (بدون تداخل أقواس)
+        std::thread(StartHacks).detach();
+    }
+}
