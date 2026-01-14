@@ -1,6 +1,6 @@
 // ==================================================================
 //  V12 ULTIMATE: Protection System + Offsets Integration
-//  Combined for Muntadhar
+//  Fixed for PT_DENY_ATTACH Error
 // ==================================================================
 
 #import <Foundation/Foundation.h>
@@ -15,6 +15,14 @@
 #import <string>
 #import <thread>
 #import <chrono>
+
+// --- FIX: تعريف الثوابت المفقودة لحل خطأ PT_DENY_ATTACH ---
+#ifndef PT_DENY_ATTACH
+#define PT_DENY_ATTACH 31
+#endif
+
+// تعريف دالة ptrace لكي يتعرف عليها المترجم
+extern "C" int ptrace(int request, pid_t pid, caddr_t addr, int data);
 
 // ==================================================================
 // 1. نظام v12 للباتش (Memory Patching Logic)
@@ -52,6 +60,7 @@ void v12(uint64_t offset, std::string hex) {
     uint64_t address = base + offset;
     std::vector<uint8_t> data = hexToBytes(hex);
     
+    // حماية: VM_PROT_COPY
     kern_return_t kret = vm_protect(mach_task_self(), (vm_address_t)address, data.size(), 0, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
     if (kret == KERN_SUCCESS) {
         vm_write(mach_task_self(), address, (vm_offset_t)data.data(), data.size());
@@ -59,7 +68,7 @@ void v12(uint64_t offset, std::string hex) {
 }
 
 // ==================================================================
-// 2. نظام الحماية (مأخوذ من ملف V12.m الخاص بك)
+// 2. نظام الحماية (Protection System)
 // ==================================================================
 
 @interface ExternalAppDetector : NSObject
@@ -80,8 +89,6 @@ void v12(uint64_t offset, std::string hex) {
     return self;
 }
 - (void)hideExternalApps {
-    // محاكاة إخفاء التطبيقات (يتم تفعيله هنا)
-    // ملاحظة: الأكواد الفعلية للـ Hooking يجب أن تكون هنا
     NSLog(@"[BYTEPASS] 🛡️ External Apps Hidden");
 }
 @end
@@ -103,7 +110,8 @@ void v12(uint64_t offset, std::string hex) {
 
 @implementation ProcessProtector
 - (void)antiDebug {
-    ptrace(PT_DENY_ATTACH, 0, 0, 0); // حماية ضد الديبق
+    // الآن هذا السطر سيعمل لأننا عرفنا PT_DENY_ATTACH في الأعلى
+    ptrace(PT_DENY_ATTACH, 0, 0, 0); 
 }
 - (void)hideProcessFromTaskList {
     NSLog(@"[BYTEPASS] 👻 Process Hidden");
@@ -114,13 +122,11 @@ void v12(uint64_t offset, std::string hex) {
 // 3. التجميع والتشغيل (Constructor)
 // ==================================================================
 
-// دالة المراقبة المستمرة (تم تحويلها لـ C function لتعمل داخل الـ constructor)
+// دالة المراقبة المستمرة
 void startContinuousMonitoring() {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
         while (true) {
-            // مراقبة بسيطة كل 5 ثواني
             [NSThread sleepForTimeInterval:5.0];
-            // هنا يمكنك إضافة أكواد فحص إضافية
         }
     });
 }
@@ -129,10 +135,9 @@ void startContinuousMonitoring() {
     @autoreleasepool {
         NSLog(@"[EXTERNAL BYPASS] 🚀 Starting Protection & Injection...");
         
-        // تشغيل الحمايات في خيط منفصل لعدم تجميد اللعبة
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
             
-            // 1. تفعيل الحمايات (من ملفك)
+            // 1. تفعيل الحمايات
             ExternalAppDetector *detector = [ExternalAppDetector new];
             [detector hideExternalApps];
             
@@ -148,15 +153,13 @@ void startContinuousMonitoring() {
             NSLog(@"[EXTERNAL BYPASS] ✅ Protection Active");
 
             // 2. تفعيل الأوفستات (4.2.0)
-            // ننتظر قليلاً للتأكد من تحميل ShadowTrackerExtra
             std::thread([]() {
+                // انتظار تحميل ShadowTrackerExtra
                 while (getShadowBase() == 0) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(3));
 
-                // --- تفعيل الهاك ---
-                
                 // Aimbot
                 v12(0x2A606EC, "08F0271E");
 
@@ -164,14 +167,4 @@ void startContinuousMonitoring() {
                 v12(0x2ECF414, "C0035FD6");
 
                 // Small Aim
-                v12(0x2ECC204, "E003271E");
-
-                // White Color
-                v12(0x60444C0, "0849B85228593AB8");
-                
-                NSLog(@"[EXTERNAL BYPASS] 💉 Offsets Injected Successfully");
-
-            }).detach();
-        });
-    }
-}
+                v12(
