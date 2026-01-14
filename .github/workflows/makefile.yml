@@ -1,4 +1,4 @@
-name: Build V12 Fixed
+name: Build V12 Final Fix
 
 on:
   push:
@@ -25,9 +25,10 @@ jobs:
           path: theos
           submodules: recursive
 
-      # 3. إعداد SDK (تم التصحيح: استخدام Git Clone بدلاً من التحميل)
+      # 3. إعداد SDK (التصحيح: حذف المجلد أولاً ثم التحميل)
       - name: Setup iOS SDK
         run: |
+          rm -rf theos/sdks
           git clone --quiet --depth=1 https://github.com/theos/sdks.git theos/sdks
 
       # 4. تعريف المسارات
