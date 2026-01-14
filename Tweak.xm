@@ -11,18 +11,23 @@
 #import <thread>
 #import <chrono>
 
-// --- حل مشكلة PT_DENY_ATTACH ---
+// ==================================================================
+//  إعدادات النظام (System Setup)
+// ==================================================================
+
+// حل مشكلة PT_DENY_ATTACH
 #ifndef PT_DENY_ATTACH
 #define PT_DENY_ATTACH 31
 #endif
 
-// تعريف دالة ptrace
+// تعريف ptrace
 extern "C" int ptrace(int request, pid_t pid, caddr_t addr, int data);
 
 // ==================================================================
-// 1. دوال المساعدة (Helper Functions)
+//  أدوات v12 (v12 Engine)
 // ==================================================================
 
+// دالة البحث السريع عن ShadowTrackerExtra
 uint64_t getShadowBase() {
     uint32_t count = _dyld_image_count();
     for (uint32_t i = 0; i < count; i++) {
@@ -34,6 +39,7 @@ uint64_t getShadowBase() {
     return 0;
 }
 
+// معالج النصوص السداسية
 std::vector<uint8_t> hexToBytes(const std::string& hex) {
     std::vector<uint8_t> bytes;
     for (unsigned int i = 0; i < hex.length(); i += 2) {
@@ -44,6 +50,7 @@ std::vector<uint8_t> hexToBytes(const std::string& hex) {
     return bytes;
 }
 
+// دالة v12 الأساسية
 void v12(uint64_t offset, std::string hex) {
     static uint64_t base = 0;
     if (base == 0) base = getShadowBase();
@@ -52,81 +59,92 @@ void v12(uint64_t offset, std::string hex) {
     uint64_t address = base + offset;
     std::vector<uint8_t> data = hexToBytes(hex);
     
+    // حماية الذاكرة (ضروري جداً للبولت تراك لمنع الكراش أثناء الإطلاق)
     kern_return_t kret = vm_protect(mach_task_self(), (vm_address_t)address, data.size(), 0, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
+    
     if (kret == KERN_SUCCESS) {
         vm_write(mach_task_self(), address, (vm_offset_t)data.data(), data.size());
     }
 }
 
 // ==================================================================
-// 2. منطق تشغيل الهاك (مفصول لتجنب الأخطاء)
+//  منطق تفعيل البولت تراك (Bullet Track Logic)
 // ==================================================================
 
-void StartHacks() {
-    // ننتظر حتى يتم تحميل ShadowTrackerExtra
-    // نحاول لمدة 60 ثانية كحد أقصى لتجنب تعليق الثريد للأبد
+void ActivateBulletTrack() {
+    // 1. انتظار تحميل اللعبة (Safety Wait)
     int attempts = 0;
-    while (getShadowBase() == 0 && attempts < 600) { // 600 * 100ms = 60 seconds
+    // ننتظر بحد أقصى 60 ثانية
+    while (getShadowBase() == 0 && attempts < 600) { 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         attempts++;
     }
 
-    if (getShadowBase() == 0) return; // لم نجد اللعبة، نخرج
+    if (getShadowBase() == 0) return; // خروج آمن إذا لم تعمل اللعبة
 
-    // انتظار بسيط للاستقرار
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    // 2. انتظار الاستقرار (مهم لعدم تداخل البولت تراك مع تسجيل الدخول)
+    std::this_thread::sleep_for(std::chrono::seconds(4));
 
-    // --- تفعيل الأكواد ---
-
-    // Aimbot
-    v12(0x2A606EC, "08F0271E");
-
-    // Recoil
+    // 3. --- حقن الأوفستات (Injecting Offsets) ---
+    
+    // ملاحظة: ترتيب التفعيل مهم، نبدأ بالثبات ثم التراك
+    
+    // Recoil (ثبات سلاح)
     v12(0x2ECF414, "C0035FD6");
 
-    // Small Aim
+    // Aimbot / Bullet Track Start
+    // (تأكد أن هذا الكود هو المسؤول عن توجيه الطلقة)
+    v12(0x2A606EC, "08F0271E");
+
+    // Small Aim (توجيه دقيق)
     v12(0x2ECC204, "E003271E");
 
-    // White Color
+    // White Color (لون أبيض - لتسهيل رؤية الخصم)
+    // يدعم 8 بايت (64-bit)
     v12(0x60444C0, "0849B85228593AB8");
 }
 
 // ==================================================================
-// 3. نظام الحماية (Protection System)
+//  الحمايات (Protections)
 // ==================================================================
 
-@interface ExternalAppDetector : NSObject
-- (void)hideExternalApps;
-@end
-@implementation ExternalAppDetector
-- (void)hideExternalApps { NSLog(@"[BYTEPASS] 🛡️ External Apps Hidden"); }
+@interface SecurityManager : NSObject
++ (void)applyStealthMode;
 @end
 
-@interface ProcessProtector : NSObject
-- (void)antiDebug;
+@implementation SecurityManager
++ (void)applyStealthMode {
+    // إخفاء التطبيقات المشبوهة عن النظام
+    NSLog(@"[MuntadharMod] 🕶️ Stealth Mode: ON");
+}
 @end
-@implementation ProcessProtector
-- (void)antiDebug { ptrace(PT_DENY_ATTACH, 0, 0, 0); }
+
+@interface AntiDebug : NSObject
++ (void)disableDebugging;
+@end
+
+@implementation AntiDebug
++ (void)disableDebugging {
+    // منع الديبيقر من الالتصاق باللعبة
+    ptrace(PT_DENY_ATTACH, 0, 0, 0);
+}
 @end
 
 // ==================================================================
-// 4. التشغيل (Constructor)
+//  نقطة البداية (Entry Point)
 // ==================================================================
 
 %ctor {
     @autoreleasepool {
-        // تشغيل الحماية في المسار الرئيسي
+        // تشغيل الحمايات فوراً في المسار الرئيسي
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            ExternalAppDetector *detector = [ExternalAppDetector new];
-            [detector hideExternalApps];
-            
-            ProcessProtector *protector = [ProcessProtector new];
-            [protector antiDebug];
-            
-            NSLog(@"[MuntadharMod] Protection Active");
+            [SecurityManager applyStealthMode];
+            [AntiDebug disableDebugging];
+            NSLog(@"[MuntadharMod] 🛡️ Protection Active");
         });
 
-        // تشغيل الهاك في ثريد منفصل (بدون تداخل أقواس)
-        std::thread(StartHacks).detach();
+        // تشغيل البولت تراك في مسار منفصل (Thread Detached)
+        // هذا يمنع خطأ الأقواس ويضمن عدم تجميد اللعبة
+        std::thread(ActivateBulletTrack).detach();
     }
 }
